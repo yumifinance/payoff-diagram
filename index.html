@@ -4,6 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>オプション ペイオフ図メーカー</title>
+<meta name="description" content="コール・プット・原資産を選んで数字を入れるだけで、満期時のペイオフ／損益グラフを描けるCFA学習用ツール。スプレッド、ストラドル、カラーなど定番戦略も一発表示。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://yumifinance.github.io/payoff-diagram/">
+<meta property="og:title" content="オプション ペイオフ図メーカー">
+<meta property="og:description" content="コール・プット・原資産を選んで数字を入れるだけで損益グラフ。スプレッドやカラーも一発表示。CFA学習用。">
+<meta property="og:image" content="https://yumifinance.github.io/payoff-diagram/ogp.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="オプション ペイオフ図メーカー">
+<meta name="twitter:description" content="コール・プット・原資産を選んで数字を入れるだけで損益グラフ。スプレッドやカラーも一発表示。CFA学習用。">
+<meta name="twitter:image" content="https://yumifinance.github.io/payoff-diagram/ogp.png">
 <style>
 :root{
   --bg:#f7f7f5;--card:#ffffff;--ink:#1d1d1f;--muted:#6b6b70;--line:#e3e3e0;
@@ -107,7 +119,8 @@ const PRESETS=[
  {n:'ショートプット',d:'強気〜横ばい。最大損失は X − p。',l:()=>[L('put','short',1,100,5)]},
  {n:'カバードコール',d:'原資産ロング＋コールショート。上値を手放してプレミアム収入。最大利益 = X − S₀ + c。',l:()=>[L('stock','long',1,100,0),L('call','short',1,110,3)]},
  {n:'プロテクティブプット',d:'原資産ロング＋プットロング。下値を保険で限定。最大損失 = S₀ − X + p。',l:()=>[L('stock','long',1,100,0),L('put','long',1,95,3)]},
- {n:'カラー',d:'原資産ロング＋プットロング＋コールショート。保険料をコール売りで相殺。',l:()=>[L('stock','long',1,100,0),L('put','long',1,90,2),L('call','short',1,110,2)]},
+ {n:'カラー',d:'原資産ロング＋プットロング（OTM）＋コールショート（OTM）。保険料の一部をコール売りで相殺。',l:()=>[L('stock','long',1,100,0),L('put','long',1,90,2.5),L('call','short',1,110,1.5)]},
+ {n:'ゼロコストカラー',d:'カラーのうち、コール売りの受取プレミアム＝プット買いの支払プレミアム（c = p）となるようXを選んだもの。ネット・プレミアム0で、損益は X_put − S₀ 〜 X_call − S₀ の範囲に限定。',l:()=>[L('stock','long',1,100,0),L('put','long',1,95,3),L('call','short',1,108,3)]},
  {n:'ブル・コール・スプレッド',d:'低いXのコール買い＋高いXのコール売り。やや強気、損益とも限定。',l:()=>[L('call','long',1,95,7),L('call','short',1,105,2)]},
  {n:'ベア・プット・スプレッド',d:'高いXのプット買い＋低いXのプット売り。やや弱気、損益とも限定。',l:()=>[L('put','long',1,105,7),L('put','short',1,95,2)]},
  {n:'ロング・ストラドル',d:'同じXのコール＋プットを買う。方向は不明だが大きく動く（ボラ上昇）と予想。',l:()=>[L('call','long',1,100,5),L('put','long',1,100,4)]},
@@ -248,7 +261,7 @@ function draw(){
   svg.innerHTML=h;
   // stats
   const cls=v=>v>0?'pos':v<0?'neg':'';
-  const netTxt=A.net>0?`${fmt(A.net)} 支払い`:A.net<0?`${fmt(-A.net)} 受取`:'0';
+  const netTxt=A.net>0?`${fmt(A.net)} 支払い`:A.net<0?`${fmt(-A.net)} 受取`:(state.legs.some(l=>l.type!=='stock')?'0（ゼロコスト）':'0');
   document.getElementById('stats').innerHTML=
     `<div class="stat"><div class="k">最大${mode==='profit'?'利益':'ペイオフ'}</div><div class="v ${cls(A.mx)}">${A.mx===Infinity?'無限大':fmt(A.mx)}</div></div>`+
     `<div class="stat"><div class="k">最大${mode==='profit'?'損失':'（最小値）'}</div><div class="v ${cls(A.mn)}">${A.mn===-Infinity?'無限大':fmt(A.mn)}</div></div>`+
