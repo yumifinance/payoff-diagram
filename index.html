@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>オプション ペイオフ図メーカー</title>
+<style>
+:root{
+  --bg:#f7f7f5;--card:#ffffff;--ink:#1d1d1f;--muted:#6b6b70;--line:#e3e3e0;
+  --accent:#2f6fdb;--pos:#1f9d61;--neg:#d64545;--posfill:rgba(31,157,97,.13);--negfill:rgba(214,69,69,.12);
+  --chip:#eef2fb;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#161618;--card:#1f1f22;--ink:#ececee;--muted:#9a9aa2;--line:#33333a;
+  --accent:#6b9cf0;--pos:#3ccf8a;--neg:#f07070;--posfill:rgba(60,207,138,.14);--negfill:rgba(240,112,112,.13);--chip:#262b36;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Segoe UI",sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 2px}
+.sub{color:var(--muted);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.presets button{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:5px 11px;font-size:12.5px;cursor:pointer}
+.presets button:hover,.presets button.on{border-color:var(--accent);color:var(--accent)}
+.presetNote{color:var(--muted);font-size:12.5px;min-height:19px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:360px 1fr;gap:14px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.secTitle{font-weight:700;font-size:13px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}
+.leg{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:10px;margin-bottom:10px}
+.legHead{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.legHead select{flex:1}
+select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:5px 7px;width:100%}
+input:disabled{opacity:.4}
+.fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.fields label{font-size:11px;color:var(--muted);display:block}
+.del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0 4px;line-height:1}
+.del:hover{color:var(--neg)}
+.formula{font-size:11.5px;color:var(--muted);margin-top:7px;font-family:ui-monospace,Menlo,monospace}
+.addBtn{width:100%;border:1px dashed var(--line);background:none;color:var(--accent);border-radius:10px;padding:9px;cursor:pointer;font:inherit}
+.addBtn:hover{border-color:var(--accent)}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:none;background:none;color:var(--muted);padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.seg button.on{background:var(--accent);color:#fff}
+.tb label{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.tb input[type=range]{width:110px;padding:0}
+.tb input[type=checkbox]{width:auto}
+svg{width:100%;height:auto;display:block;touch-action:none;user-select:none}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+@media (max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.stat .k{font-size:11px;color:var(--muted)}
+.stat .v{font-size:16px;font-weight:700}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.hover{margin-top:10px;font-size:12.5px}
+.hover table{width:100%;border-collapse:collapse}
+.hover td{padding:3px 4px;border-bottom:1px solid var(--line)}
+.hover td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.hint{color:var(--muted);font-size:12px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>オプション ペイオフ図メーカー</h1>
+  <p class="sub">コール・プット・原資産を選んで数字を入れると、満期時のペイオフ／損益グラフを描きます。複数のポジションを重ねると合成戦略になります。</p>
+
+  <div class="presets" id="presets"></div>
+  <div class="presetNote" id="presetNote">↑ 定番の戦略を読み込めます（数字はあとから自由に変更できます）</div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="secTitle"><span>ポジション</span><span class="hint">1単位＝原資産1株分</span></div>
+      <div id="legs"></div>
+      <button class="addBtn" id="addBtn">＋ ポジションを追加</button>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="seg" id="modeSeg">
+          <button data-m="profit" class="on">損益（Profit）</button>
+          <button data-m="payoff">ペイオフ（Payoff）</button>
+        </div>
+        <span class="tb"><label><input type="checkbox" id="showLegs" checked>各ポジションも表示</label></span>
+        <span class="tb"><label>表示幅<input type="range" id="range" min="10" max="100" value="40"></label></span>
+      </div>
+      <div class="hint" id="modeHint"></div>
+      <svg id="chart" viewBox="0 0 720 420"></svg>
+      <div class="stats" id="stats"></div>
+      <div class="hover" id="hover"><span class="hint">グラフの上にカーソルを乗せる（タップする）と、その満期株価 S<sub>T</sub> での各ポジションの値が見られます。</span></div>
+    </div>
+  </div>
+  <p class="hint" style="margin-top:18px">※ 学習用ツールです。投資助言ではありません。満期時点の損益のみを表示し、手数料・税金・金利・時間価値は考慮していません。</p>
+</div>
+
+<script>
+const COLORS=['#2f6fdb','#e08a2e','#8e44ad','#16a085','#c2185b','#7f8c8d','#b8860b','#0097a7'];
+let nextId=1;
+const L=(type,pos,qty,strike,prem)=>({id:nextId++,type,pos,qty,strike,prem});
+const state={legs:[L('call','long',1,100,5)],mode:'profit',showLegs:true,range:40,hoverS:null};
+
+const PRESETS=[
+ {n:'ロングコール',d:'強気。下値リスクはプレミアムまで、上値は無限大。',l:()=>[L('call','long',1,100,5)]},
+ {n:'ショートコール',d:'弱気〜横ばい。利益はプレミアムまで、損失は無限大。',l:()=>[L('call','short',1,100,5)]},
+ {n:'ロングプット',d:'弱気。最大利益は X − p（株価0のとき）。',l:()=>[L('put','long',1,100,5)]},
+ {n:'ショートプット',d:'強気〜横ばい。最大損失は X − p。',l:()=>[L('put','short',1,100,5)]},
+ {n:'カバードコール',d:'原資産ロング＋コールショート。上値を手放してプレミアム収入。最大利益 = X − S₀ + c。',l:()=>[L('stock','long',1,100,0),L('call','short',1,110,3)]},
+ {n:'プロテクティブプット',d:'原資産ロング＋プットロング。下値を保険で限定。最大損失 = S₀ − X + p。',l:()=>[L('stock','long',1,100,0),L('put','long',1,95,3)]},
+ {n:'カラー',d:'原資産ロング＋プットロング＋コールショート。保険料をコール売りで相殺。',l:()=>[L('stock','long',1,100,0),L('put','long',1,90,2),L('call','short',1,110,2)]},
+ {n:'ブル・コール・スプレッド',d:'低いXのコール買い＋高いXのコール売り。やや強気、損益とも限定。',l:()=>[L('call','long',1,95,7),L('call','short',1,105,2)]},
+ {n:'ベア・プット・スプレッド',d:'高いXのプット買い＋低いXのプット売り。やや弱気、損益とも限定。',l:()=>[L('put','long',1,105,7),L('put','short',1,95,2)]},
+ {n:'ロング・ストラドル',d:'同じXのコール＋プットを買う。方向は不明だが大きく動く（ボラ上昇）と予想。',l:()=>[L('call','long',1,100,5),L('put','long',1,100,4)]},
+ {n:'ショート・ストラドル',d:'同じXのコール＋プットを売る。あまり動かない（ボラ低下）と予想。',l:()=>[L('call','short',1,100,5),L('put','short',1,100,4)]},
+ {n:'ロング・ストラングル',d:'OTMのコール＋プットを買う。ストラドルより安いが、もっと大きく動く必要あり。',l:()=>[L('call','long',1,110,2),L('put','long',1,90,2)]},
+ {n:'ロング・バタフライ',d:'X₁買い・X₂を2枚売り・X₃買い（コール）。X₂付近で止まると予想。',l:()=>[L('call','long',1,90,12),L('call','short',2,100,5),L('call','long',1,110,1.5)]},
+ {n:'合成ロングフォワード',d:'コール買い＋プット売り（同じX）。原資産ロングと同じ形（プット・コール・パリティ）。',l:()=>[L('call','long',1,100,5),L('put','short',1,100,5)]},
+];
+
+const fmt=n=>{if(!isFinite(n))return n>0?'∞':'−∞';const r=Math.round(n*100)/100;return (r<0?'−':'')+Math.abs(r).toLocaleString('ja-JP',{maximumFractionDigits:2})};
+const sgnFmt=n=>(n>0?'+':'')+fmt(n);
+
+function legName(l){const p=l.pos==='long'?'ロング':'ショート';const t={call:'コール',put:'プット',stock:'原資産'}[l.type];return p+t;}
+function legVal(l,S,mode){
+  const s=(l.pos==='long'?1:-1)*(+l.qty||0);const K=+l.strike||0,pr=+l.prem||0;let v;
+  if(l.type==='call')v=Math.max(0,S-K)-(mode==='profit'?pr:0);
+  else if(l.type==='put')v=Math.max(0,K-S)-(mode==='profit'?pr:0);
+  else v=mode==='profit'?S-K:S;
+  return s*v;
+}
+const total=(S,mode)=>state.legs.reduce((a,l)=>a+legVal(l,S,mode),0);
+function legFormula(l,mode){
+  const sg=l.pos==='long'?'':'−';const q=(+l.qty||0)!==1?`${l.qty}×`:'';
+  if(l.type==='call')return mode==='profit'?`${sg}${q}[max(0, S−${fmt(+l.strike)}) − ${fmt(+l.prem)}]`:`${sg}${q}max(0, S−${fmt(+l.strike)})`;
+  if(l.type==='put')return mode==='profit'?`${sg}${q}[max(0, ${fmt(+l.strike)}−S) − ${fmt(+l.prem)}]`:`${sg}${q}max(0, ${fmt(+l.strike)}−S)`;
+  return mode==='profit'?`${sg}${q}(S − ${fmt(+l.strike)})`:`${sg}${q}S`;
+}
+
+/* ---------- legs UI ---------- */
+const legsEl=document.getElementById('legs');
+function renderLegs(){
+  legsEl.innerHTML='';
+  state.legs.forEach((l,i)=>{
+    const c=COLORS[i%COLORS.length];const st=l.type==='stock';
+    const d=document.createElement('div');d.className='leg';d.style.setProperty('--c',c);
+    d.innerHTML=`
+      <div class="legHead">
+        <select data-k="type"><option value="call">コール</option><option value="put">プット</option><option value="stock">原資産（株）</option></select>
+        <select data-k="pos"><option value="long">ロング（買い）</option><option value="short">ショート（売り）</option></select>
+        <button class="del" title="削除">×</button>
+      </div>
+      <div class="fields">
+        <div><label>数量</label><input type="number" data-k="qty" min="0" step="1" value="${l.qty}"></div>
+        <div><label>${st?'現在の株価 S₀':'権利行使価格 X'}</label><input type="number" data-k="strike" step="0.5" value="${l.strike}"></div>
+        <div><label>${st?'（プレミアムなし）':'プレミアム '+(l.type==='call'?'c':'p')}</label><input type="number" data-k="prem" step="0.25" min="0" value="${st?'':l.prem}" ${st?'disabled':''}></div>
+      </div>
+      <div class="formula"></div>`;
+    d.querySelector('[data-k=type]').value=l.type;d.querySelector('[data-k=pos]').value=l.pos;
+    d.querySelectorAll('select').forEach(s=>s.onchange=()=>{l[s.dataset.k]=s.value;clearPreset();renderLegs();draw();});
+    d.querySelectorAll('input').forEach(inp=>inp.oninput=()=>{l[inp.dataset.k]=inp.value;clearPreset();draw();});
+    d.querySelector('.del').onclick=()=>{state.legs=state.legs.filter(x=>x.id!==l.id);clearPreset();renderLegs();draw();};
+    legsEl.appendChild(d);
+  });
+}
+function updateFormulas(){
+  legsEl.querySelectorAll('.leg').forEach((d,i)=>{const l=state.legs[i];if(l)d.querySelector('.formula').textContent=legName(l)+' = '+legFormula(l,state.mode);});
+}
+document.getElementById('addBtn').onclick=()=>{
+  const ref=state.legs.find(l=>l.type!=='stock')||state.legs[0];
+  state.legs.push(L('put','long',1,ref?+ref.strike||100:100,3));clearPreset();renderLegs();draw();
+};
+
+/* ---------- presets ---------- */
+const presetsEl=document.getElementById('presets'),noteEl=document.getElementById('presetNote');
+PRESETS.forEach(p=>{const b=document.createElement('button');b.textContent=p.n;
+  b.onclick=()=>{state.legs=p.l();presetsEl.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    noteEl.innerHTML=`<b>${p.n}</b>：${p.d}`;renderLegs();draw();};presetsEl.appendChild(b);});
+function clearPreset(){presetsEl.querySelectorAll('button').forEach(x=>x.classList.remove('on'));}
+
+/* ---------- toolbar ---------- */
+document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{state.mode=b.dataset.m;
+  document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));draw();});
+document.getElementById('showLegs').onchange=e=>{state.showLegs=e.target.checked;draw();};
+document.getElementById('range').oninput=e=>{state.range=+e.target.value;draw();};
+
+/* ---------- analysis ---------- */
+function kinks(){return [...new Set(state.legs.filter(l=>l.type!=='stock').map(l=>+l.strike||0))].filter(k=>k>0).sort((a,b)=>a-b);}
+function analyze(mode){
+  const ks=kinks();const M=Math.max(1,...ks,...state.legs.map(l=>+l.strike||0));
+  const pts=[0,...ks];
+  const slopeR=total(M+1,mode)-total(M,mode);
+  let mx=-Infinity,mn=Infinity;pts.concat([M]).forEach(s=>{const v=total(s,mode);mx=Math.max(mx,v);mn=Math.min(mn,v);});
+  if(slopeR>1e-9)mx=Infinity;if(slopeR<-1e-9)mn=-Infinity;
+  // breakevens (exact, piecewise linear)
+  const bes=[];const segs=[...pts,M*10+1e4];
+  for(let i=0;i<segs.length-1;i++){const a=segs[i],b=segs[i+1];if(b<=a)continue;const fa=total(a,mode),fb=total(b,mode);
+    if(Math.abs(fa)<1e-9&&Math.abs(fb)<1e-9)continue;
+    if(Math.abs(fa)<1e-9)bes.push(a);else if(fa*fb<0)bes.push(a+(-fa)*(b-a)/(fb-fa));}
+  const ub=[];bes.forEach(x=>{if(!ub.some(y=>Math.abs(y-x)<1e-6))ub.push(x);});
+  const net=state.legs.reduce((a,l)=>l.type==='stock'?a:a+(l.pos==='long'?1:-1)*(+l.qty||0)*(+l.prem||0),0);
+  return {mx,mn,bes:ub,net};
+}
+
+/* ---------- chart ---------- */
+const svg=document.getElementById('chart');const W=720,H=420,P={l:56,r:18,t:18,b:42};
+function niceStep(span,n){const raw=span/n,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return (f<1.5?1:f<3?2:f<7?5:10)*p;}
+let geo=null;
+function draw(){
+  const mode=state.mode;updateFormulas();
+  document.getElementById('modeHint').textContent=mode==='profit'
+    ?'損益（Profit）＝ 満期時の価値 − 支払ったプレミアム（売りなら＋受取プレミアム）。原資産は S_T − S₀。'
+    :'ペイオフ（Payoff）＝ 満期時の価値のみ（プレミアムを含まない）。原資産のペイオフは S_T そのもの。';
+  if(!state.legs.length){svg.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--muted)" font-size="14">ポジションを追加してください</text>`;document.getElementById('stats').innerHTML='';geo=null;return;}
+  const refs=state.legs.map(l=>+l.strike||0).filter(x=>x>0);if(!refs.length)refs.push(100);
+  const c=refs.reduce((a,b)=>a+b,0)/refs.length;const r=state.range/100;
+  const lo=Math.max(0,Math.min(...refs)-c*r),hi=Math.max(...refs)+c*r;
+  const xs=[lo,...kinks().filter(k=>k>lo&&k<hi),hi];
+  const series=[xs.map(s=>total(s,mode))];state.legs.forEach(l=>series.push(xs.map(s=>legVal(l,s,mode))));
+  const all=(state.showLegs?series.flat():series[0]).concat([0]);
+  let ymin=Math.min(...all),ymax=Math.max(...all);const pad=(ymax-ymin||10)*.12;ymin-=pad;ymax+=pad;
+  const X=s=>P.l+(s-lo)/(hi-lo)*(W-P.l-P.r),Y=v=>P.t+(ymax-v)/(ymax-ymin)*(H-P.t-P.b);
+  geo={lo,hi,X,Y,ymin,ymax};
+  let h='';
+  // grid
+  const xs1=niceStep(hi-lo,8);for(let t=Math.ceil(lo/xs1)*xs1;t<=hi+1e-9;t+=xs1){h+=`<line x1="${X(t)}" x2="${X(t)}" y1="${P.t}" y2="${H-P.b}" stroke="var(--line)"/><text x="${X(t)}" y="${H-P.b+16}" text-anchor="middle" font-size="11" fill="var(--muted)">${fmt(t)}</text>`;}
+  const ys1=niceStep(ymax-ymin,7);for(let t=Math.ceil(ymin/ys1)*ys1;t<=ymax+1e-9;t+=ys1){h+=`<line x1="${P.l}" x2="${W-P.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--line)"/><text x="${P.l-6}" y="${Y(t)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${fmt(t)}</text>`;}
+  h+=`<text x="${(W+P.l)/2}" y="${H-6}" text-anchor="middle" font-size="12" fill="var(--muted)">満期時の株価 S_T</text>`;
+  h+=`<text x="14" y="${(H)/2}" text-anchor="middle" font-size="12" fill="var(--muted)" transform="rotate(-90 14 ${H/2})">${mode==='profit'?'損益':'ペイオフ'}</text>`;
+  // fills
+  const y0=Y(0);const line=xs.map((s,i)=>`${X(s)},${Y(series[0][i])}`).join(' ');
+  const poly=`${X(lo)},${y0} ${line} ${X(hi)},${y0}`;
+  h+=`<defs><clipPath id="up"><rect x="0" y="0" width="${W}" height="${Math.max(0,y0)}"/></clipPath><clipPath id="dn"><rect x="0" y="${y0}" width="${W}" height="${Math.max(0,H-y0)}"/></clipPath></defs>`;
+  h+=`<polygon points="${poly}" fill="var(--posfill)" clip-path="url(#up)"/><polygon points="${poly}" fill="var(--negfill)" clip-path="url(#dn)"/>`;
+  // strikes
+  const seen=new Set();state.legs.forEach((l,i)=>{const k=+l.strike;if(!(k>lo&&k<hi))return;const key=l.type+k;if(seen.has(k)){return;}seen.add(k);
+    h+=`<line x1="${X(k)}" x2="${X(k)}" y1="${P.t}" y2="${H-P.b}" stroke="var(--muted)" stroke-dasharray="2 4" opacity=".6"/><text x="${X(k)+3}" y="${P.t+11}" font-size="10.5" fill="var(--muted)">${l.type==='stock'?'S₀':'X'}=${fmt(k)}</text>`;});
+  // zero axis
+  h+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y0}" y2="${y0}" stroke="var(--ink)" stroke-width="1" opacity=".55"/>`;
+  // legs
+  if(state.showLegs&&state.legs.length>1)state.legs.forEach((l,i)=>{h+=`<polyline points="${xs.map((s,j)=>`${X(s)},${Y(series[i+1][j])}`).join(' ')}" fill="none" stroke="${COLORS[i%COLORS.length]}" stroke-width="1.6" stroke-dasharray="6 4" opacity=".85"/>`;});
+  // total
+  const tc=state.legs.length>1?'var(--ink)':COLORS[0];
+  h+=`<polyline points="${line}" fill="none" stroke="${tc}" stroke-width="3" stroke-linejoin="round"/>`;
+  // breakevens
+  const A=analyze(mode);
+  if(mode==='profit')A.bes.forEach(b=>{if(b>=lo&&b<=hi)h+=`<circle cx="${X(b)}" cy="${y0}" r="4.5" fill="var(--card)" stroke="${tc}" stroke-width="2"/><text x="${X(b)}" y="${y0+(series[0][0]>0?-9:16)}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">BE ${fmt(b)}</text>`;});
+  h+=`<g id="hov"></g><rect id="hit" x="${P.l}" y="${P.t}" width="${W-P.l-P.r}" height="${H-P.t-P.b}" fill="transparent"/>`;
+  svg.innerHTML=h;
+  // stats
+  const cls=v=>v>0?'pos':v<0?'neg':'';
+  const netTxt=A.net>0?`${fmt(A.net)} 支払い`:A.net<0?`${fmt(-A.net)} 受取`:'0';
+  document.getElementById('stats').innerHTML=
+    `<div class="stat"><div class="k">最大${mode==='profit'?'利益':'ペイオフ'}</div><div class="v ${cls(A.mx)}">${A.mx===Infinity?'無限大':fmt(A.mx)}</div></div>`+
+    `<div class="stat"><div class="k">最大${mode==='profit'?'損失':'（最小値）'}</div><div class="v ${cls(A.mn)}">${A.mn===-Infinity?'無限大':fmt(A.mn)}</div></div>`+
+    `<div class="stat"><div class="k">損益分岐点（BE）</div><div class="v">${mode==='profit'?(A.bes.length?A.bes.map(fmt).join(' / '):'なし'):'損益モードで表示'}</div></div>`+
+    `<div class="stat"><div class="k">ネット・プレミアム</div><div class="v ${A.net>0?'neg':A.net<0?'pos':''}">${netTxt}</div></div>`;
+  if(state.hoverS!=null)showHover(state.hoverS);
+}
+function showHover(S){
+  if(!geo)return;const {X,Y}=geo;const mode=state.mode;const v=total(S,mode);
+  const g=svg.querySelector('#hov');if(!g)return;
+  g.innerHTML=`<line x1="${X(S)}" x2="${X(S)}" y1="${P.t}" y2="${H-P.b}" stroke="var(--accent)" stroke-width="1"/>`+
+    `<circle cx="${X(S)}" cy="${Y(v)}" r="5" fill="var(--accent)"/>`+
+    `<text x="${Math.min(X(S)+8,W-90)}" y="${Math.max(Y(v)-10,P.t+12)}" font-size="12" font-weight="700" fill="var(--accent)">S=${fmt(S)} → ${sgnFmt(v)}</text>`;
+  let rows=state.legs.map((l,i)=>{const lv=legVal(l,S,mode);return `<tr><td><span class="dot" style="background:${COLORS[i%COLORS.length]}"></span>${legName(l)}${(+l.qty||0)!==1?' ×'+l.qty:''}（${l.type==='stock'?'S₀':'X'}=${fmt(+l.strike)}）</td><td class="${lv>0?'pos':lv<0?'neg':''}">${sgnFmt(lv)}</td></tr>`;}).join('');
+  if(state.legs.length>1)rows+=`<tr><td><b>合計</b></td><td class="${v>0?'pos':v<0?'neg':''}"><b>${sgnFmt(v)}</b></td></tr>`;
+  document.getElementById('hover').innerHTML=`<div class="secTitle" style="margin-bottom:4px">満期株価 S<sub>T</sub> = ${fmt(S)} のとき（${mode==='profit'?'損益':'ペイオフ'}）</div><table>${rows}</table>`;
+}
+function onPtr(e){
+  if(!geo)return;const rc=svg.getBoundingClientRect();const x=(e.clientX-rc.left)/rc.width*W;
+  if(x<P.l||x>W-P.r)return;let S=geo.lo+(x-P.l)/(W-P.l-P.r)*(geo.hi-geo.lo);
+  const step=(geo.hi-geo.lo)>60?1:0.5;S=Math.round(S/step)*step;state.hoverS=S;showHover(S);
+}
+svg.addEventListener('pointermove',onPtr);svg.addEventListener('pointerdown',onPtr);
+
+renderLegs();draw();
+</script>
+</body>
+</html>
